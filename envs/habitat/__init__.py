@@ -19,6 +19,7 @@ def make_env_fn(args, config_env, rank):
     config_env.SIMULATOR.SCENE = dataset.episodes[0].scene_id
     config_env.freeze()
 
+    # 在这里初始化环境，也就是对obs进行了预处理
     if args.agent == "sem_exp":
         env = Sem_Exp_Env_Agent(args=args, rank=rank,
                                 config_env=config_env,

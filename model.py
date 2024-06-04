@@ -170,13 +170,17 @@ class Semantic_Mapping(nn.Module):
             args.num_processes, 1 + self.num_sem_categories, vr, vr,
             self.max_height - self.min_height
         ).float().to(self.device)
+        
+        # 获得特征图
         self.feat = torch.ones(
             args.num_processes, 1 + self.num_sem_categories,
             self.screen_h // self.du_scale * self.screen_w // self.du_scale
         ).float().to(self.device)
-
+    
+    # obs: RGBD图像，pose_obs: 位姿，maps_last: 上一次的地图，poses_last: 上一次的位置
     def forward(self, obs, pose_obs, maps_last, poses_last):
         bs, c, h, w = obs.size()
+        # 第3个channel，深度图像
         depth = obs[:, 3, :, :]
 
         point_cloud_t = du.get_point_cloud_from_z_t(
@@ -200,6 +204,8 @@ class Semantic_Mapping(nn.Module):
         XYZ_cm_std[..., 2] = XYZ_cm_std[..., 2] / z_resolution
         XYZ_cm_std[..., 2] = (XYZ_cm_std[..., 2] -
                               (max_h + min_h) // 2.) / (max_h - min_h) * 2.
+        # 由观测数据(obs)获得特征图(self.feat)
+        # 这里的obs[:, 4:, :, :]就是从第4channel开始取，即为语义特征部分，详见/root/autodl-tmp/project/ogn/Object-Goal-Navigation/agents/sem_exp.py的plan_act_and_preprocess函数中
         self.feat[:, 1:, :] = nn.AvgPool2d(self.du_scale)(
             obs[:, 4:, :, :]
         ).view(bs, c - 4, h // self.du_scale * w // self.du_scale)
@@ -209,6 +215,7 @@ class Semantic_Mapping(nn.Module):
                                      XYZ_cm_std.shape[1],
                                      XYZ_cm_std.shape[2] * XYZ_cm_std.shape[3])
 
+        # 这一步就是，点云(XYZ_cm_std)+特征图(self.feat)(含语义标签)=>体素(voxels),详细解释/root/autodl-tmp/project/ogn/explanation.md
         voxels = du.splat_feat_nd(
             self.init_grid * 0., self.feat, XYZ_cm_std).transpose(2, 3)
 

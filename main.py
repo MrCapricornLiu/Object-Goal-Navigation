@@ -81,6 +81,7 @@ def main():
     # Starting environments
     torch.set_num_threads(1)
     envs = make_vec_envs(args)
+    # 初始化语义地图时用的obs在这里获得，也就是agent一开始观测到的RGBD图像（存疑？）
     obs, infos = envs.reset()
 
     torch.set_grad_enabled(False)
@@ -257,11 +258,15 @@ def main():
     if args.eval:
         g_policy.eval()
 
+    # 初始时调用semantic map生成语义地图（下面的这两句代码）
+    
     # Predict semantic map from frame 1
+    # 提取每个环境的传感器位姿，并将其转换为 PyTorch 张量，以便在设备（CPU 或 GPU）上进行计算
     poses = torch.from_numpy(np.asarray(
         [infos[env_idx]['sensor_pose'] for env_idx in range(num_scenes)])
     ).float().to(device)
 
+    # 调用Semantic_Mapping实例的forward方法，处理当前观测的RGBD图像(obs)和位姿(poses)，生成更新后的局部地图和局部位姿。这些数据在后续的全局策略决策和动作执行中会被使用
     _, local_map, _, local_pose = \
         sem_map_module(obs, poses, local_map, local_pose)
 
@@ -337,6 +342,7 @@ def main():
     spl_per_category = defaultdict(list)
     success_per_category = defaultdict(list)
 
+    # 循环执行3个模块
     for step in range(args.num_training_frames // args.num_processes + 1):
         if finished.sum() == args.num_processes:
             break

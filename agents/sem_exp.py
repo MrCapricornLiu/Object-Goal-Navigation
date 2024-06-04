@@ -60,7 +60,8 @@ class Sem_Exp_Env_Agent(ObjectGoal_Env):
         args = self.args
 
         obs, info = super().reset()
-        obs = self._preprocess_obs(obs)
+        # 在这里，对obs进行了预处理，这里经过_preprocess_obs处理后的obs，添加了语义信息，0，1，2通道是RGB，3通道是depth，4-19通道是semantic_pred
+        obs = self._preprocess_obs(obs) 
 
         self.obs_shape = obs.shape
 
@@ -82,6 +83,7 @@ class Sem_Exp_Env_Agent(ObjectGoal_Env):
         return obs, info
 
     def plan_act_and_preprocess(self, planner_inputs):
+        # 终于让我找到了，就在这里
         """Function responsible for planning, taking the action and
         preprocessing observations
 
@@ -95,6 +97,7 @@ class Sem_Exp_Env_Agent(ObjectGoal_Env):
                      'found_goal' (bool): whether the goal object is found
 
         Returns:
+        # 就在这里，预处理后的obs
             obs (ndarray): preprocessed observations ((4+C) x H x W)
             reward (float): amount of reward returned after previous action
             done (bool): whether the episode has ended
@@ -123,6 +126,7 @@ class Sem_Exp_Env_Agent(ObjectGoal_Env):
             action = {'action': action}
             obs, rew, done, info = super().step(action)
 
+            # 就在这里，预处理obs，# 在这里，对obs进行了预处理，这里经过_preprocess_obs处理后的obs，添加了语义信息，0，1，2通道是RGB，3通道是depth，4-19通道是semantic_pred
             # preprocess obs
             obs = self._preprocess_obs(obs) 
             self.last_action = action['action']
@@ -290,12 +294,14 @@ class Sem_Exp_Env_Agent(ObjectGoal_Env):
 
         return (stg_x, stg_y), stop
 
+    # 就是这里，对obs（RGBD图像）进行预处理
     def _preprocess_obs(self, obs, use_seg=True):
         args = self.args
         obs = obs.transpose(1, 2, 0)
-        rgb = obs[:, :, :3]
-        depth = obs[:, :, 3:4]
+        rgb = obs[:, :, :3] # 0，1，2通道是RGB
+        depth = obs[:, :, 3:4] # 3通道是depth
 
+        # 这里，调用_get_sem_pred方法，RGB->semantic_pred（也就是论文fig3中的RGB经过MaskRCNN->semantic prediction）
         sem_seg_pred = self._get_sem_pred(
             rgb.astype(np.uint8), use_seg=use_seg)
         depth = self._preprocess_depth(depth, args.min_depth, args.max_depth)
@@ -307,6 +313,9 @@ class Sem_Exp_Env_Agent(ObjectGoal_Env):
             sem_seg_pred = sem_seg_pred[ds // 2::ds, ds // 2::ds]
 
         depth = np.expand_dims(depth, axis=2)
+        # 这里最后返回的state，就是预处理后的obs
+        # state = [RGB, depth, semantic_pred]
+        # 0，1，2通道是RGB，3通道是depth，4-19通道是semantic_pred
         state = np.concatenate((rgb, depth, sem_seg_pred),
                                axis=2).transpose(2, 0, 1)
 
